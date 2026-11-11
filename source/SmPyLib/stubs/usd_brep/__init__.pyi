@@ -17,6 +17,18 @@ _Point3 = tuple[float, float, float]
 _Vec3 = tuple[float, float, float]
 _BBox = tuple[_Point3, _Point3]
 
+class MinimumRadiusSolution(TypedDict):
+    solution_type: Literal[1, 2]
+    num_variables: int
+    parameter: float
+    value: float
+    end_parameter: float | None
+    end_value: float | None
+
+class MinimumRadiusResult(TypedDict):
+    status: int
+    solutions: list[MinimumRadiusSolution]
+
 class TessellationFailure(TypedDict):
     face_index: int
     stage: Literal["boundary_preparation", "face_tessellation", "polygon_output"]
@@ -478,6 +490,9 @@ def create_curve_approx_points(points: Sequence[_Point3]) -> Curve: ...
 def create_curve_interp_points(points: Sequence[_Point3], *, parameterization: CurveParameterization = ...) -> Curve: ...
 def offset_curve(curve: BSplineCurve, distance: float) -> Curve: ...
 def evaluate_curve(curve: Curve, parameter: float) -> dict[str, _Point3]: ...
+def minimum_radius_solutions(
+    curve: Curve, u_min: float, u_max: float, distance_tolerance: float = 1e-10
+) -> MinimumRadiusResult: ...
 def evaluate_continuity(curve: Curve, parameter: float) -> ContinuityType: ...
 def drop_curve_to_surface(curve: BSplineCurve, surface: Surface) -> list[Curve]: ...
 def convert_to_lines_and_arcs(curve: BSplineCurve) -> list[Curve]: ...

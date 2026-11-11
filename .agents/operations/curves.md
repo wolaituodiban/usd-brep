@@ -4,7 +4,7 @@
 # Curve Creation and Operations
 
 **Source:** `source/SM_API/inc/SmApiCurves.h`
-**Python:** `_omni_solid.create_line_segment`, `create_line`, `create_circle`, `create_arc`, `create_helix`, `create_ellipse`, `create_rectangle`, `create_regular_polygon`, `create_curve`, `create_canonical_curve`, `create_curve_approx_points`, `create_curve_interp_points`, `offset_curve`, `evaluate_curve`, `evaluate_continuity`, `drop_curve_to_surface`, `convert_to_lines_and_arcs`, `project_curve_to_surface`, `lift_uv_curve`, `make_curves_compatible`, `order_curves`, `remove_curve_knots`
+**Python:** `_omni_solid.create_line_segment`, `create_line`, `create_circle`, `create_arc`, `create_helix`, `create_ellipse`, `create_rectangle`, `create_regular_polygon`, `create_curve`, `create_canonical_curve`, `create_curve_approx_points`, `create_curve_interp_points`, `offset_curve`, `evaluate_curve`, `minimum_radius_solutions`, `evaluate_continuity`, `drop_curve_to_surface`, `convert_to_lines_and_arcs`, `project_curve_to_surface`, `lift_uv_curve`, `make_curves_compatible`, `order_curves`, `remove_curve_knots`
 
 ## Overview
 
@@ -167,6 +167,39 @@ shape deviation. This simplifies the curve representation.
 - Calls `SmBSplineCurve::RemoveKnots`; non-B-spline curve types are unchanged.
 - The API passes `SmTol::GetApproxTol3d(curve)`, resolved from owning topology or context,
   to the kernel and propagates failures. It exposes no tolerance argument or removed-knot count.
+
+### minimum_radius_solutions
+
+Find native minimum-curvature-radius solutions on a parameter interval.
+Available as `sm.minimum_radius_solutions` and `sm.curves.minimum_radius_solutions`.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `curve` | Curve | Input geometry; unchanged by the query |
+| `u_min` | float | Finite start parameter in the natural domain |
+| `u_max` | float | Finite end parameter, strictly greater than `u_min` |
+| `distance_tolerance` | float | Finite non-negative answer-identity tolerance; default `1e-10` |
+
+```python
+curve = sm.create_circle((0, 0, 0), 2.0)
+lo, hi = curve.parameter_range()
+result = sm.curves.minimum_radius_solutions(curve, lo, hi)
+for solution in result["solutions"]:
+    print(solution["parameter"], solution["value"])
+```
+
+The result contains `status` (1000 on success) and `solutions` in native order.
+Each record contains `solution_type` (1 for a point, 2 for a range),
+`num_variables`, `parameter`, `value` (radius), `end_parameter`, and `end_value`.
+Point records have `None` for both end fields; ranges carry both endpoint records.
+An empty native result is returned unchanged, including for a straight line.
+
+This calls `SmCurve::GlobalPropertyAnalysis` with
+`SM_CP_MINIMIZE_RADIUS_OF_CURVATURE`; it does not resample, reevaluate values,
+or change the native search and merging tolerances. It minimizes radius, not
+curvature. Native numerical convergence and coverage limitations still apply.
+Invalid intervals or tolerances raise `ValueError`, invalid curve types raise
+`TypeError`, and native failures raise `RuntimeError`.
 
 ## Building Profiles for Sweeps
 

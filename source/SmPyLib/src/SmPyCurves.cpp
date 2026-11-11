@@ -8,6 +8,9 @@
 
 #include <SmApiCurves.h>
 #include <SmEllipse.h>
+#include <SmSolutionArray.h>
+
+#include <cmath>
 
 void bind_curves(BoundModule& m)
 {
@@ -484,6 +487,102 @@ void bind_curves(BoundModule& m)
        "    evaluate_continuity: Continuity classification at a parameter.\n"
        "\n"
        "Wraps: SmApiEvaluateCurve");
+
+    m.def(
+        "minimum_radius_solutions",
+        [](SmCurve* curve, double u_min, double u_max, double distance_tolerance)
+        {
+            if (!std::isfinite(u_min) || !std::isfinite(u_max) || u_min >= u_max)
+            {
+                throw py::value_error("Require finite parameters with u_min < u_max");
+            }
+            if (!std::isfinite(distance_tolerance) || distance_tolerance < 0.0)
+            {
+                throw py::value_error("distance_tolerance must be finite and non-negative");
+            }
+            const SmExtent1d natural = curve->GetNaturalInterval();
+            if (u_min < natural.GetMin() || u_max > natural.GetMax())
+            {
+                throw py::value_error("Requested interval must lie in the curve's natural domain");
+            }
+
+            SmSolutionArray solutions;
+            CHECK_STATUS(curve->GlobalPropertyAnalysis(
+                SmExtent1d(u_min, u_max),
+                SM_CP_MINIMIZE_RADIUS_OF_CURVATURE,
+                nullptr,
+                nullptr,
+                distance_tolerance,
+                solutions,
+                nullptr,
+                nullptr
+            ));
+
+            py::list rows;
+            for (ULONG index = 0; index < solutions.GetSize(); ++index)
+            {
+                const SmSolution& solution = solutions[index];
+                py::dict row;
+                row["solution_type"] = static_cast<int>(solution.m_eSolutionType);
+                row["num_variables"] = solution.m_lNumVariables;
+                row["parameter"] = solution.m_vStart.m_adParameters[0];
+                row["value"] = solution.m_vStart.m_dSolutionValue;
+                if (solution.m_eSolutionType == SM_ST_RANGE_OF_VALUES)
+                {
+                    row["end_parameter"] = solution.m_vEnd.m_adParameters[0];
+                    row["end_value"] = solution.m_vEnd.m_dSolutionValue;
+                }
+                else
+                {
+                    row["end_parameter"] = py::none();
+                    row["end_value"] = py::none();
+                }
+                rows.append(std::move(row));
+            }
+            py::dict result;
+            result["status"] = static_cast<long>(SM_SUCCESS);
+            result["solutions"] = std::move(rows);
+            return result;
+        },
+        py::arg("curve").none(false),
+        py::arg("u_min"),
+        py::arg("u_max"),
+        py::arg("distance_tolerance") = 1.0e-10,
+        "Find native minimum-curvature-radius solutions on a curve interval.\n"
+        "\n"
+        "Args:\n"
+        "    curve: Curve to analyze. Geometry is unchanged.\n"
+        "    u_min: Finite start parameter in the natural domain.\n"
+        "    u_max: Finite end parameter in the natural domain.\n"
+        "        Must be greater than u_min.\n"
+        "    distance_tolerance: Finite tolerance used by the native solver\n"
+        "        to identify equivalent answers. Must be non-negative.\n"
+        "\n"
+        "Returns:\n"
+        "    dict: ``status`` (1000 on success) and ``solutions`` in native\n"
+        "    order. Each solution has ``solution_type`` (1 for a point, 2\n"
+        "    for a range), ``num_variables``, ``parameter``, ``value``\n"
+        "    (radius), ``end_parameter`` and ``end_value``. The last two\n"
+        "    fields are None for point solutions.\n"
+        "\n"
+        "Notes:\n"
+        "    Preserves the native numerical search and solution records;\n"
+        "    does not resample, sort, merge, or reevaluate returned radii.\n"
+        "    An empty solution list is preserved, including for a straight\n"
+        "    line; it is not converted to an infinite-radius solution.\n"
+        "    This minimizes radius, not curvature. Native solver tolerances\n"
+        "    and convergence behavior still apply.\n"
+        "\n"
+        "Raises:\n"
+        "    ValueError: Invalid interval or distance tolerance.\n"
+        "    TypeError: curve is None or is not a Curve.\n"
+        "\n"
+        "See Also:\n"
+        "    Curve.parameter_range: Natural parameter domain.\n"
+        "    evaluate_curve: Point and derivatives at a parameter.\n"
+        "\n"
+        "Wraps: SmCurve::GlobalPropertyAnalysis"
+    );
 
     m.def("evaluate_continuity", [](SmCurve* curve, double param) {
         SmContinuityType ct = SM_CT_DISCONTINUOUS;

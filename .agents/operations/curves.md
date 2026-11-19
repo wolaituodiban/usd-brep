@@ -3,8 +3,8 @@
 
 # Curve Creation and Operations
 
-**Source:** `source/SM_API/inc/SmApiCurves.h`
-**Python:** `_omni_solid.create_line_segment`, `create_line`, `create_circle`, `create_arc`, `create_helix`, `create_ellipse`, `create_rectangle`, `create_regular_polygon`, `create_curve`, `create_canonical_curve`, `create_curve_approx_points`, `create_curve_interp_points`, `offset_curve`, `evaluate_curve`, `minimum_radius_solutions`, `evaluate_continuity`, `drop_curve_to_surface`, `convert_to_lines_and_arcs`, `project_curve_to_surface`, `lift_uv_curve`, `make_curves_compatible`, `order_curves`, `remove_curve_knots`
+**Source:** `source/SM_API/inc/SmApiCurves.h`, `source/SMLib/inc/SmCurve.h`
+**Python:** `_omni_solid.create_line_segment`, `create_line`, `create_circle`, `create_arc`, `create_helix`, `create_ellipse`, `create_rectangle`, `create_regular_polygon`, `create_curve`, `create_canonical_curve`, `create_curve_approx_points`, `create_curve_interp_points`, `offset_curve`, `evaluate_curve`, `evaluate_curve_curvature`, `minimum_radius_solutions`, `evaluate_continuity`, `drop_curve_to_surface`, `convert_to_lines_and_arcs`, `project_curve_to_surface`, `lift_uv_curve`, `make_curves_compatible`, `order_curves`, `remove_curve_knots`
 
 ## Overview
 
@@ -200,6 +200,35 @@ or change the native search and merging tolerances. It minimizes radius, not
 curvature. Native numerical convergence and coverage limitations still apply.
 Invalid intervals or tolerances raise `ValueError`, invalid curve types raise
 `TypeError`, and native failures raise `RuntimeError`.
+
+### evaluate_curve_curvature
+
+Evaluate the scalar geometric curvature at one parameter. Available as
+`sm.evaluate_curve_curvature` and `sm.curves.evaluate_curve_curvature`.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `curve` | Curve | Input geometry; unchanged by the query |
+| `parameter` | float | Finite parameter in the curve's natural domain |
+| `side` | `"left"` or `"right"` | Select the lower- or upper-parameter interval at a knot |
+
+```python
+curve = sm.create_canonical_curve(
+    points=[(-1, 0, 0), (-0.5, 0, 0), (0, 0, 0), (0.5, 0, 0), (1, 0.25, 0)],
+    knots=[-1, 0, 1], knot_multiplicities=[3, 2, 3], degree=2,
+)
+left = sm.evaluate_curve_curvature(curve, 0.0, "left")
+right = sm.curves.evaluate_curve_curvature(curve, 0.0, "right")
+```
+
+The result is the magnitude of the native Frenet frame curvature vector.
+`"left"` selects the lower-parameter interval (`FALSE` in
+`SmCurve::EvaluateGeometric`); `"right"` selects the upper-parameter interval
+(`TRUE`). At a smooth parameter the side choice does not change the value.
+At natural endpoints, use the available inward side. Non-finite or out-of-domain
+parameters and unknown side strings raise `ValueError`; native failures raise
+`RuntimeError`. Non-finite or negative curvature output also raises
+`RuntimeError`.
 
 ## Building Profiles for Sweeps
 

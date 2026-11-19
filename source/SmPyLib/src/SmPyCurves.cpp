@@ -488,6 +488,67 @@ void bind_curves(BoundModule& m)
        "\n"
        "Wraps: SmApiEvaluateCurve");
 
+    m.def("evaluate_curve_curvature",
+        [](SmCurve* curve, double parameter, const std::string& side) {
+            if (!std::isfinite(parameter))
+            {
+                throw py::value_error("parameter must be finite");
+            }
+            if (side != "left" && side != "right")
+            {
+                throw py::value_error("side must be 'left' or 'right'");
+            }
+
+            const SmExtent1d natural = curve->GetNaturalInterval();
+            if (parameter < natural.GetMin() || parameter > natural.GetMax())
+            {
+                throw py::value_error(
+                    "parameter must lie in the curve's natural domain");
+            }
+
+            SmVector3d frame[3];
+            CHECK_STATUS(curve->EvaluateGeometric(
+                parameter, 2, side == "right" ? TRUE : FALSE, frame));
+            const double curvature = frame[2].Length();
+            if (!std::isfinite(curvature) || curvature < 0.0)
+            {
+                throw std::runtime_error(
+                    "SMLib returned an invalid curvature value");
+            }
+            return curvature;
+        },
+        py::arg("curve").none(false),
+        py::arg("parameter"),
+        py::arg("side"),
+        "Evaluate the geometric curvature magnitude at a curve parameter.\n"
+        "\n"
+        "Args:\n"
+        "    curve: Curve to evaluate.\n"
+        "    parameter: Finite parameter within the curve's natural domain.\n"
+        "    side: ``\"left\"`` for the lower-parameter interval or ``\"right\"``\n"
+        "        for the upper-parameter interval at a knot. Use the inward\n"
+        "        side at a natural endpoint.\n"
+        "\n"
+        "Returns:\n"
+        "    float: Curvature magnitude from the native Frenet frame.\n"
+        "\n"
+        "Raises:\n"
+        "    ValueError: The parameter is non-finite or outside the natural\n"
+        "        domain, or ``side`` is not ``\"left\"`` or ``\"right\"``.\n"
+        "    TypeError: ``curve`` is None or is not a Curve.\n"
+        "    RuntimeError: Native evaluation fails or returns an invalid\n"
+        "        curvature value.\n"
+        "\n"
+        "Notes:\n"
+        "    At a smooth parameter, both side values return the same\n"
+        "    curvature. At a knot, they select its one-sided values.\n"
+        "\n"
+        "See Also:\n"
+        "    evaluate_curve: Point and parametric derivatives.\n"
+        "    minimum_radius_solutions: Native minimum-radius extrema.\n"
+        "\n"
+        "Wraps: SmCurve::EvaluateGeometric");
+
     m.def(
         "minimum_radius_solutions",
         [](SmCurve* curve, double u_min, double u_max, double distance_tolerance)
